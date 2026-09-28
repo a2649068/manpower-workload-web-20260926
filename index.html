@@ -13,8 +13,15 @@
       <p>使用電子郵件與密碼登入。新帳號須先點信件中的驗證連結。</p>
       <label>電子郵件<input id="email" type="email" required autocomplete="email"></label>
       <label>密碼<input id="password" type="password" required minlength="6" autocomplete="current-password"></label>
-      <div class="actions"><button type="submit">登入</button><button type="button" id="signup" class="secondary">建立帳號</button></div>
+      <div class="actions"><button type="submit">登入</button><button type="button" id="signup" class="secondary">建立帳號</button><button type="button" id="forgot-password" class="secondary">忘記密碼</button></div>
       <p id="auth-message" role="status"></p>
+    </form>
+    <form id="recovery-form" class="auth-card" hidden>
+      <h1>設定新密碼</h1>
+      <p>請輸入至少 6 碼的新密碼，完成後回登入畫面使用新密碼。</p>
+      <label>新密碼<input id="new-password" type="password" required minlength="6" autocomplete="new-password"></label>
+      <div class="actions"><button type="submit">儲存新密碼</button></div>
+      <p id="recovery-message" role="status"></p>
     </form>
   </main>
   <div id="app" hidden>
