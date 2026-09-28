@@ -16,6 +16,16 @@
     scroller.addEventListener('touchend',event=>{if(event.touches.length<2)startDistance=0});
     scroller.addEventListener('touchcancel',()=>{startDistance=0});
   })}
+  function enableDragScroll(){document.querySelectorAll('.sheet-scroll').forEach(scroller=>{
+    scroller.addEventListener('mousedown',event=>{
+      if(event.button!==0||window.matchMedia('(max-width:800px)').matches||!event.target.closest('.grid')||event.target.closest('button,input,select,a,textarea,[contenteditable="true"]'))return;
+      const startX=event.clientX,startLeft=scroller.scrollLeft;let moved=false;
+      event.preventDefault();scroller.classList.add('dragging');
+      const move=e=>{if(!(e.buttons&1)){stop();return}if(Math.abs(e.clientX-startX)>3)moved=true;if(moved){e.preventDefault();scroller.scrollLeft=startLeft-(e.clientX-startX)}};
+      const stop=()=>{scroller.classList.remove('dragging');window.removeEventListener('mousemove',move);window.removeEventListener('mouseup',stop);window.removeEventListener('blur',stop)};
+      window.addEventListener('mousemove',move);window.addEventListener('mouseup',stop);window.addEventListener('blur',stop);
+    });
+  })}
   function message(t,error=false){$('status').textContent=t;$('status').style.color=error?'#b3261e':'#176b35'}
   function authMessage(t,error=false){$('auth-message').textContent=t;$('auth-message').className=error?'error':''}
   function showRecovery(){state.recoveryMode=true;$('auth').hidden=false;$('app').hidden=true;$('auth-form').hidden=true;$('recovery-form').hidden=false;$('new-password').focus()}
@@ -57,6 +67,6 @@
     $('signup').addEventListener('click',async()=>{if(!$('email').checkValidity()||!$('password').checkValidity()){authMessage('請先輸入有效電子郵件及至少 6 碼密碼。',true);return}authMessage('正在建立帳號…');const {error}=await state.client.auth.signUp({email:$('email').value.trim(),password:$('password').value,options:{emailRedirectTo:location.origin+location.pathname}});authMessage(error?error.message:'帳號已建立，請到信箱完成驗證，再回來登入。',!!error)});
     $('forgot-password').addEventListener('click',async()=>{if(!$('email').checkValidity()){authMessage('請先輸入帳號的電子郵件。',true);$('email').focus();return}authMessage('正在寄送重設密碼信…');const {error}=await state.client.auth.resetPasswordForEmail($('email').value.trim(),{redirectTo:location.origin+location.pathname});authMessage(error?error.message:'如果此電子郵件有帳號，請到信箱收取重設密碼信，並點信中的連結。',!!error)});
     $('recovery-form').addEventListener('submit',async e=>{e.preventDefault();const el=$('recovery-message');el.textContent='正在儲存…';const {error}=await state.client.auth.updateUser({password:$('new-password').value});if(error){el.textContent=error.message;el.className='error';return}await state.client.auth.signOut();state.recoveryMode=false;$('recovery-form').hidden=true;$('auth-form').hidden=false;$('new-password').value='';$('password').value='';authMessage('新密碼已儲存，請用新密碼登入。')});
-    $('logout').addEventListener('click',logout);$('refresh').addEventListener('click',()=>Promise.all([loadAssignments(),loadReferences()]).catch(e=>message(e.message,true)));$('more').addEventListener('click',()=>{state.shown=Math.min(980,state.shown+100);renderSchedule();$('more').disabled=state.shown===980});$('sheet-zoom').addEventListener('input',e=>setGridZoom(Number(e.target.value)/100));enableTouchZoom();document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.panel').forEach(p=>p.hidden=p.id!==b.dataset.tab)}));state.client.auth.onAuthStateChange((event,session)=>{if(event==='PASSWORD_RECOVERY'){showRecovery();return}if(event==='SIGNED_OUT'){clearInterval(state.referenceTimer);$('app').hidden=true;$('auth').hidden=false}else if((event==='SIGNED_IN'||event==='INITIAL_SESSION')&&!state.recoveryMode)setTimeout(()=>signedIn(session),0)})}
+    $('logout').addEventListener('click',logout);$('refresh').addEventListener('click',()=>Promise.all([loadAssignments(),loadReferences()]).catch(e=>message(e.message,true)));$('more').addEventListener('click',()=>{state.shown=Math.min(980,state.shown+100);renderSchedule();$('more').disabled=state.shown===980});$('sheet-zoom').addEventListener('input',e=>setGridZoom(Number(e.target.value)/100));enableTouchZoom();enableDragScroll();document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.panel').forEach(p=>p.hidden=p.id!==b.dataset.tab)}));state.client.auth.onAuthStateChange((event,session)=>{if(event==='PASSWORD_RECOVERY'){showRecovery();return}if(event==='SIGNED_OUT'){clearInterval(state.referenceTimer);$('app').hidden=true;$('auth').hidden=false}else if((event==='SIGNED_IN'||event==='INITIAL_SESSION')&&!state.recoveryMode)setTimeout(()=>signedIn(session),0)})}
   init();
 })();
