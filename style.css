@@ -7,3 +7,5 @@
 @media(min-width:801px){.sheet-scroll .grid td:not(:has(button,input,select)){cursor:grab}.sheet-scroll.dragging,.sheet-scroll.dragging .grid td{cursor:grabbing!important;user-select:none}}
 .schedule-grid td:nth-child(n+2):nth-child(-n+7){position:static}.schedule-grid th:nth-child(n+2):nth-child(-n+7){left:auto;z-index:3}
 @media(max-width:800px){.sheet-scroll{-webkit-overflow-scrolling:touch}}
+
+#pending{min-height:0;padding:24px}.approval-panel{padding:20px}.approval-panel .sheet-scroll{height:auto;max-height:60vh;min-height:0}.approval-panel .grid{width:100%;min-width:780px}.approval-panel td{padding:8px}
