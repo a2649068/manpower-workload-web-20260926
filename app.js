@@ -5,7 +5,7 @@
   const months = Array.from({length:53},(_,i)=>{const d=new Date(2026,8+i,1);return {year:d.getFullYear(),month:d.getMonth()+1,label:`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}`}});
   const header = ['姓名','專案名稱','設置容量(kW)','建置地點','進場日期','併聯日期',...months.map(x=>x.label)];
   const fieldMap = {name:'person_name',project:'project_name',start:'start_date',end:'end_date'};
-  const state = {client:null,assignments:new Map(),summary:new Map(),contacts:[],projects:[],shown:81,channel:null,referenceTimer:null,recoveryMode:false,filterPerson:'',filterProject:''};
+  const state = {client:null,assignments:new Map(),summary:new Map(),contacts:[],projects:[],shown:81,channel:null,referenceTimer:null,recoveryMode:false,filterPeople:[],filterProject:''};
   let gridZoom=1;
   function setGridZoom(value){gridZoom=Math.max(.5,Math.min(2,value));document.querySelectorAll('.grid').forEach(table=>table.style.zoom=String(gridZoom));$('zoom-value').textContent=`${Math.round(gridZoom*100)}%`;$('sheet-zoom').value=String(Math.round(gridZoom*20)*5)}
   function enableTouchZoom(){document.querySelectorAll('.sheet-scroll').forEach(scroller=>{
@@ -37,15 +37,72 @@
   function scheduleFilterOptions(field,referenceValues){
     return [...new Set([...referenceValues,...[...state.assignments.values()].map(row=>row[field])].filter(Boolean))].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
   }
+
+  function closePeopleFilter(){
+    const panel=$('people-filter-panel');if(panel)panel.hidden=true;
+    $('filter-person')?.setAttribute('aria-expanded','false');
+  }
+  function makePeopleFilter(){
+    const button=document.createElement('button');button.type='button';button.id='filter-person';
+    button.textContent=state.filterPeople.length?`已選 ${state.filterPeople.length} 人 ▾`:'全部姓名 ▾';
+    button.title=state.filterPeople.length?state.filterPeople.join('、'):'勾選多位團隊成員';
+    button.setAttribute('aria-label','依姓名複選篩選團隊排程');
+    button.setAttribute('aria-haspopup','dialog');button.setAttribute('aria-controls','people-filter-panel');
+    button.setAttribute('aria-expanded',String(Boolean($('people-filter-panel')&&!$('people-filter-panel').hidden)));
+    Object.assign(button.style,{display:'block',width:'100%',marginTop:'4px',padding:'4px 2px',height:'30px',background:'#fff',fontSize:'12px',whiteSpace:'nowrap'});
+    button.addEventListener('click',()=>{
+      let panel=$('people-filter-panel');
+      if(panel&&!panel.hidden){closePeopleFilter();return}
+      if(!panel){
+        panel=document.createElement('div');panel.id='people-filter-panel';panel.hidden=true;
+        panel.setAttribute('role','dialog');panel.setAttribute('aria-label','選擇團隊成員');
+        Object.assign(panel.style,{position:'fixed',zIndex:'100',width:'280px',maxWidth:'calc(100vw - 16px)',maxHeight:'65vh',overflowY:'auto',padding:'12px',border:'1px solid #9aa0a6',borderRadius:'8px',background:'#fff',boxShadow:'0 4px 18px #0003',fontSize:'14px',color:'#202124'});
+        document.body.append(panel);
+        document.addEventListener('click',event=>{if(!panel.hidden&&!panel.contains(event.target)&&!$('filter-person')?.contains(event.target))closePeopleFilter()});
+        document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!panel.hidden){closePeopleFilter();$('filter-person')?.focus({preventScroll:true})}});
+      }
+      panel.replaceChildren();
+      const title=document.createElement('strong');title.textContent='勾選團隊成員';
+      const hint=document.createElement('p');hint.textContent='可勾選多人；未勾選時顯示全部姓名。';hint.style.margin='6px 0';
+      panel.append(title,hint);
+      const options=scheduleFilterOptions('person_name',[...state.contacts.map(x=>x[1]),...state.filterPeople]);
+      for(const name of options){
+        const label=document.createElement('label');Object.assign(label.style,{display:'flex',alignItems:'center',gap:'8px',padding:'8px 4px',cursor:'pointer'});
+        const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.value=name;checkbox.checked=state.filterPeople.includes(name);
+        Object.assign(checkbox.style,{width:'18px',height:'18px',flexShrink:'0'});
+        checkbox.addEventListener('change',()=>{
+          state.filterPeople=checkbox.checked?[...new Set([...state.filterPeople,name])]:state.filterPeople.filter(person=>person!==name);
+          state.filterProject='';
+          const scroller=$('schedule-table').closest('.sheet-scroll'),left=scroller.scrollLeft;
+          renderSchedule();scroller.scrollLeft=left;scroller.scrollTop=0;
+        });
+        const text=document.createElement('span');text.textContent=name;label.append(checkbox,text);panel.append(label);
+      }
+      const actions=document.createElement('div');Object.assign(actions.style,{display:'flex',gap:'8px',position:'sticky',bottom:'-12px',background:'#fff',padding:'10px 0 0'});
+      const all=document.createElement('button');all.type='button';all.className='secondary';all.textContent='顯示全部';
+      all.addEventListener('click',()=>{state.filterPeople=[];state.filterProject='';closePeopleFilter();renderSchedule();$('filter-person')?.focus({preventScroll:true})});
+      const done=document.createElement('button');done.type='button';done.textContent='完成';
+      done.addEventListener('click',()=>{closePeopleFilter();$('filter-person')?.focus({preventScroll:true})});
+      actions.append(all,done);panel.append(actions);panel.hidden=false;
+      const rect=button.getBoundingClientRect();
+      panel.style.left=Math.max(8,Math.min(rect.left,window.innerWidth-296))+'px';
+      panel.style.top=Math.max(8,Math.min(rect.bottom+4,window.innerHeight-panel.offsetHeight-8))+'px';
+      button.setAttribute('aria-expanded','true');
+      panel.querySelector('input,button')?.focus({preventScroll:true});
+    });
+    return button;
+  }
+
   function matchingScheduleRows(){
     return [...state.assignments.entries()].filter(([,row])=>
-      (!state.filterPerson||row.person_name===state.filterPerson)&&
+      (!state.filterPeople.length||state.filterPeople.includes(row.person_name))&&
       (!state.filterProject||row.project_name===state.filterProject)
     ).sort((a,b)=>a[0]-b[0]);
   }
   function makeScheduleFilter(field,value,options,allLabel,label){
     const select=makeSelect(value,options,allLabel,v=>{
-      state.filterPerson=field==='person'?v:'';
+      state.filterPeople=[];
+      closePeopleFilter();
       state.filterProject=field==='project'?v:'';
       const scroller=$('schedule-table').closest('.sheet-scroll');
       const left=scroller.scrollLeft;
@@ -64,11 +121,11 @@
       Object.assign(controls.style,{display:'inline-flex',alignItems:'center',gap:'8px',flexWrap:'wrap'});
       const text=document.createElement('span');text.id='schedule-filter-count';text.setAttribute('role','status');
       const reset=document.createElement('button');reset.type='button';reset.className='secondary';reset.id='clear-schedule-filters';reset.textContent='顯示全部';
-      reset.addEventListener('click',()=>{state.filterPerson='';state.filterProject='';renderSchedule()});
+      reset.addEventListener('click',()=>{state.filterPeople=[];state.filterProject='';closePeopleFilter();renderSchedule()});
       controls.append(text,reset);document.querySelector('#schedule .sheet-toolbar').append(controls);
     }
-    const filtered=Boolean(state.filterPerson||state.filterProject);
-    $('schedule-filter-count').textContent=filtered?`符合篩選：${count} 筆排程`:'可在姓名／專案名稱表頭篩選';
+    const filtered=Boolean(state.filterPeople.length||state.filterProject);
+    $('schedule-filter-count').textContent=filtered?`${state.filterPeople.length?'已選 '+state.filterPeople.length+' 人；':''}符合篩選：${count} 筆排程`:'可在姓名／專案名稱表頭篩選';
     $('clear-schedule-filters').hidden=!filtered;
     $('more').hidden=filtered;
   }
@@ -76,11 +133,11 @@
   function renderSchedule(){
     const table=$('schedule-table');table.replaceChildren();const cols=document.createElement('colgroup');[82,110,220,120,120,118,118,...months.map(()=>66)].forEach(w=>{const col=document.createElement('col');col.style.width=w+'px';cols.append(col)});table.append(cols);
     const thead=document.createElement('thead'),tr=document.createElement('tr');const n=document.createElement('th');n.className='rownum';n.textContent='';tr.append(n);header.forEach((h,i)=>{const c=document.createElement('th');c.textContent=h;
-      if(i===0)c.append(makeScheduleFilter('person',state.filterPerson,scheduleFilterOptions('person_name',state.contacts.map(x=>x[1])),'全部姓名','依姓名篩選排程'));
+      if(i===0)c.append(makePeopleFilter());
       if(i===1)c.append(makeScheduleFilter('project',state.filterProject,scheduleFilterOptions('project_name',state.projects.map(x=>x.name)),'全部專案','依專案篩選排程'));
       if(i>=6)c.className='month';tr.append(c)});thead.append(tr);table.append(thead);
     const body=document.createElement('tbody');const names=state.contacts.map(x=>x[1]).filter(Boolean),projects=state.projects.map(x=>x.name);
-    const filtered=Boolean(state.filterPerson||state.filterProject);
+    const filtered=Boolean(state.filterPeople.length||state.filterProject);
     const matches=matchingScheduleRows();
     const indices=filtered?matches.map(([index])=>index):Array.from({length:state.shown},(_,i)=>i+2);
     renderFilterStatus(matches.length);
